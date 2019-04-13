@@ -41,3 +41,39 @@ function getMostRecentRecordData(categoryId, category, valueColumn, statusColumn
   JSON.stringify(record);
   return (record);  
 }
+
+//Gets data values from all records when /reports is accessed
+app.get('/reports', function (req, res)
+{
+  let sql = 'SELECT TIMESTAMP datetime, TEMPERATURE temp, HUMIDITY humidity, BAROMETRIC_PRESSURE pressure, LIGHT_INTENSITY light FROM T_ENV_HIST ORDER BY datetime DESC'
+  var rows = db.run(sql); //'rows' since the data will output as an array, even if only one record is selected
+  var i = 0;
+  var records = []; //Array of JSON objects to return, each one with data for a racord
+  while (i < rows.length) //Loop ot create a JSON object for each record
+  {
+	//Assigning date from datetime - MM/DD/YYYY
+	var date = rows[i].datetime.substr(5,2) + '/' +  rows[i].datetime.substr(8,2) + '/' + rows[i].datetime.substr(0,4);
+	//Assigning time from datetime - HH:MM and 12 hour time
+	var hour = parseInt(rows[i].datetime.substr(11,2));
+	var period = "am";
+	if (hour > 12) {
+		hour -= 12;
+		var period = "pm";
+	}
+	//Assign each record's values to the right fields in a JSON
+	var time = hour + ':' +  rows[i].datetime.substr(14,2) + period;
+    var record = {
+      datetime: rows[i].datetime,
+	  date: date,
+	  time: time,
+	  temperature: rows[i].temp,
+	  humidity: rows[i].humidity,
+	  pressure: rows[i].pressure,
+	  light: rows[i].light
+    };
+    JSON.stringify(record);
+	records[i] = record;
+	i++;
+  }
+  res.json(records);
+});
