@@ -16,6 +16,13 @@ const path = require('path');
 const dbPath = path.resolve(__dirname, 'fortipi.db');
 db.connect(dbPath);
 
+//Add header allowing API use by any host (not quite sure how to restrict it at this point)
+app.use(function(req, res, next) {
+  res.header("Access-Control-Allow-Origin", '*');
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  next();
+});
+
 //Gets all four data values when /dashboard is accessed
 app.get('/dashboard', function (req, res)
 {
