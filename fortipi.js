@@ -10,11 +10,10 @@ var server = app.listen(port, hostname, function() {
   console.log('Server running at http://'+ hostname + ':' + port + '/');
 });
 
-var db = require('sqlite-sync');
+
 
 const path = require('path');
 const dbPath = path.resolve(__dirname, 'fortipi.db');
-db.connect(dbPath);
 
 //Add header allowing API use by any host (not quite sure how to restrict it at this point)
 app.use(function(req, res, next) {
@@ -36,6 +35,8 @@ app.get('/dashboard', function (req, res)
 //Gets a data value and its status from the most recent recording and returns data in a JSON
 function getMostRecentRecordData(categoryId, category, valueColumn, statusColumn, measureUnit)
 {
+  var db = require('sqlite-sync');
+  db.connect(dbPath);
   let sql = 'SELECT MAX(TIMESTAMP), ' + valueColumn + ' value, ' + statusColumn + ' statusColor FROM T_ENV_HIST'
   var rows = db.run(sql); //'rows' since the data will output as an array, even if only one record is selected
   var record = {
@@ -46,12 +47,15 @@ function getMostRecentRecordData(categoryId, category, valueColumn, statusColumn
 	status_color: rows[0].statusColor
    };
   JSON.stringify(record);
-  return (record);  
+  return (record); 
+  db.close();
 }
 
 //Gets data values from all records when /reports is accessed
 app.get('/reports', function (req, res)
 {
+  var db = require('sqlite-sync');
+  db.connect(dbPath);
   let sql = 'SELECT TIMESTAMP datetime, TEMPERATURE temp, HUMIDITY humidity, BAROMETRIC_PRESSURE pressure, LIGHT_INTENSITY light FROM T_ENV_HIST ORDER BY datetime DESC'
   var rows = db.run(sql); //'rows' since the data will output as an array, even if only one record is selected
   var i = 0;
@@ -83,4 +87,5 @@ app.get('/reports', function (req, res)
 	i++;
   }
   res.json(records);
+  db.close();
 });
