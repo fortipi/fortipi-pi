@@ -2,6 +2,8 @@ const http = require('http');
 
 const express = require('express');
 const app = express();
+app.use(express.json());       // to support JSON-encoded bodies
+app.use(express.urlencoded()); // to support URL-encoded bodies
 
 const hostname = 'localhost';
 const port = 3000;
@@ -9,8 +11,6 @@ const port = 3000;
 var server = app.listen(port, hostname, function() {
   console.log('Server running at http://'+ hostname + ':' + port + '/');
 });
-
-
 
 const path = require('path');
 const dbPath = path.resolve(__dirname, 'fortipi.db');
@@ -25,10 +25,10 @@ app.use(function(req, res, next) {
 //Gets all four data values when /dashboard is accessed
 app.get('/dashboard', function (req, res)
 {
-  var temp = getMostRecentRecordData(1, 'Temperature', 'TEMPERATURE', 'TEMP_STATUS', 'F');
+  var temp = getMostRecentRecordData(1, 'Temperature', 'TEMPERATURE', 'TEMP_STATUS', 'C');
   var humidity = getMostRecentRecordData(2, 'Humidity', 'HUMIDITY', 'HUM_STATUS', '%');
-  var pressure = getMostRecentRecordData(3, 'Pressure', 'BAROMETRIC_PRESSURE', 'BAR_STATUS', 'mbp');
-  var light = getMostRecentRecordData(4, 'Light Intensity', 'LIGHT_INTENSITY', 'LIGHT_STATUS', 'lm');
+  var pressure = getMostRecentRecordData(3, 'Pressure', 'BAROMETRIC_PRESSURE', 'BAR_STATUS', 'hPa');
+  var light = getMostRecentRecordData(4, 'Light Intensity', 'LIGHT_INTENSITY', 'LIGHT_STATUS', ' lux');
   res.json([temp, humidity, pressure, light]);
 });
 
@@ -42,13 +42,13 @@ function getMostRecentRecordData(categoryId, category, valueColumn, statusColumn
   var record = {
     id: categoryId,
 	reading: category,
-	current_value: rows[0].value,
+	current_value: Math.round(rows[0].value),
 	unit_of_measure: measureUnit,
-	status_color: rows[0].statusColor
+	status_color: rows[0].statusColor.toLowerCase()
    };
   JSON.stringify(record);
   return (record); 
-  db.close();
+  db.close();  
 }
 
 //Gets data values from all records when /reports is accessed
@@ -74,7 +74,6 @@ app.get('/reports', function (req, res)
 	//Assign each record's values to the right fields in a JSON
 	var time = hour + ':' +  rows[i].datetime.substr(14,2) + period;
     var record = {
-      datetime: rows[i].datetime,
 	  date: date,
 	  time: time,
 	  temperature: rows[i].temp,
@@ -88,4 +87,55 @@ app.get('/reports', function (req, res)
   }
   res.json(records);
   db.close();
+});
+
+//Gets all current settings values when /settings is accessed
+app.get('/settings', function (req, res)
+{
+  var db = require('sqlite-sync');
+  db.connect(dbPath);
+  let sql = 'SELECT * FROM T_ENV_IDEAL'
+  var plantRows = db.run(sql); //'rows' since the data will output as an array, even if only one record is selected
+  sql = 'SELECT * FROM T_NOTIFICATION'
+  var contactRows = db.run(sql); //'rows' since the data will output as an array, even if only one record is selected
+  var record = {
+    email: contactRows[0].EMAIL,
+	phone: contactRows[0].PHONE_NUMBER,
+	temperature: plantRows[0].TEMPERATURE,
+	t_deviation: plantRows[0].TEMP_DEV,
+	humidity: plantRows[0].HUMIDITY,
+	h_deviation: plantRows[0].HUM_DEV,
+	light: plantRows[0].LIGHT_INTENSITY,
+	l_deviation: plantRows[0].LIGHT_DEV,
+	pressure: plantRows[0].BAROMETRIC_PRESSURE,
+	p_deviation: plantRows[0].BAR_DEV
+   };
+  JSON.stringify(record);
+  res.json(record);
+  db.close();  
+});
+
+//Posts all new settings values when /settings is accessed
+app.post('/settings', function (req, res)
+{
+  var db = require('sqlite-sync');
+  db.connect(dbPath);
+  var email = req.body.email;
+  var phone = req.body.phone;
+  var temp = req.body.temperature;
+  var t_dev = req.body.t_deviation;
+  var hum = req.body.humidity;
+  var h_dev = req.body.h_deviation;
+  var light = req.body.light;
+  var l_dev = req.body.l_deviation;
+  var pressure = req.body.pressure;
+  var p_dev = req.body.p_deviation;
+  let sql = 'UPDATE T_ENV_IDEAL SET TEMPERATURE = ' + temp + ', TEMP_DEV = ' + t_dev;
+  sql += ', HUMIDITY = ' + hum + ', HUM_DEV = ' + h_dev;
+  sql += ', LIGHT_INTENSITY = ' + light + ', LIGHT_DEV = ' + l_dev;
+  sql += ', BAROMETRIC_PRESSURE = ' + pressure + ', BAR_DEV = ' + p_dev;
+  db.run(sql);
+  sql = 'UPDATE T_NOTIFICATION SET EMAIL = \'' + email + '\', PHONE_NUMBER = \'' + phone + '\'';
+  db.run(sql);
+  res.end();
 });
